@@ -1,0 +1,1201 @@
+
+# coding: utf-8
+
+# # Data wrangling WeRateDogs by Kamal Chahal
+#
+# Table of Contents
+#
+#     Introduction
+#     Gathering data
+#     Assessing data
+#         Quality
+#         Tidiness
+#     Cleaning data - design , code , test
+#     Storing, Analyzing, and Visualizing
+#         Insight 1st
+#         Insight 2nd
+#         Insight 3rd
+#         Insight  4th
+#
+# Introduction
+#
+# There are sources form data  - twitter data , image data and archive data.
+# The dataset is the tweet archive of Twitter user @dog_rates, also known as WeRateDogs.
+# The goal of this project is to wrangle the WeRateDogs Twitter data to create analyses and visualizations.recommended steps are gather, assess and clean the Twitter data for a  analysis and visualization.
+#
+
+# # Gathering data
+
+# In[1]:
+
+
+# import all important libraries
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+get_ipython().run_line_magic('matplotlib', 'inline')
+import datetime as dt
+import json
+import re
+import requests
+import tweepy
+import os
+import csv
+
+
+# In[2]:
+
+
+# importing twitter archived data as df dataframe.
+df = pd.read_csv('twitter-archive-enhanced2.txt')
+df.head(2)
+
+
+# In[3]:
+
+
+df.info()
+
+
+# In[4]:
+
+
+df
+
+
+# In[5]:
+
+
+# passing API authorization passwords . i have struggled for this API data due to errors or time out etc .
+#Query the Twitter API for each tweet's JSON data using Python's Tweepy library and store each tweet's JSON data in a file
+auth = tweepy.OAuthHandler('5Uur0mo4ol2kB8yhtZ1VxXS0u', 'h8E7fSpXWiMoBel7G1ZOAeu4Mgru0v0MtxH5ehYE1RKM89SiBH')
+auth.set_access_token('303562412-ct9aNnU0FQR0UKJVn1i1W3Y8omqSewiQWUcRaygB', 'D3qslrbdOU5fqTOp951kOIuZbkeTPBodnjNYoEGFR63Ft')
+api = tweepy.API(auth,
+                 parser = tweepy.parsers.JSONParser(),
+                 wait_on_rate_limit = True,
+                 wait_on_rate_limit_notify = True)
+
+
+# In[6]:
+
+
+# collecting data twitter data by using query from DF( archived twitter data by tweet id )
+tweet_ids = list(df.tweet_id)
+
+tweet_data = {}
+for tweet in tweet_ids:
+    try:
+        tweet_status = api.get_status(tweet,
+                                      wait_on_rate_limit=True,
+                                      wait_on_rate_limit_notify=True)
+        tweet_data[str(tweet)] = tweet_status._json
+    except:
+        print("Error for: " + str(tweet))
+
+
+# In[7]:
+
+
+# Programmatically download the dog image prediction files from Udacity server using Request library
+
+folder_name = 'image_predictions'
+if not os.path.exists(folder_name):
+    os.makedirs(folder_name)
+
+url = 'https://d17h27t6h515a5.cloudfront.net/topher/2017/August/599fd2ad_image-predictions/image-predictions.tsv'
+response = requests.get(url)
+response
+
+with open(os.path.join(folder_name,
+                      url.split('/')[-1]), mode='wb') as file:
+    file.write(response.content)
+
+
+# In[8]:
+
+
+# using resource lookup from : https://stackabuse.com/reading-and-writing-json-to-a-file-in-python/
+# saving twitter data in tweet_json.txt
+
+import json
+
+with open('tweet_json.txt', 'w') as outfile:
+    json.dump(tweet_data, outfile,
+              sort_keys = True,
+              indent=4,
+              ensure_ascii = False)
+
+
+# # Assessing Data
+#
+# Step 1 - assess data visually and programmatically for quality and tidiness issues.
+#
+# Step  2 Document at least eight (8) quality issues and two (2) tidiness issues
+
+# In[8]:
+
+
+# reading the dog image table , which was saved after pulling the data from udacity request lib  .
+
+images = pd.read_table('image_predictions/image-predictions.tsv',
+                       sep='\t')
+
+
+# # reading Tweets data
+
+# In[9]:
+
+
+# reading the twitter data
+df_tweets= pd.read_json('tweet_json.txt',orient='index')
+
+
+# In[10]:
+
+
+# reading 5 top head rows of twitter data
+df_tweets
+
+
+# In[11]:
+
+
+df_tweets.info()
+
+
+# In[12]:
+
+
+df_tweets.source.value_counts()
+
+
+# In[13]:
+
+
+# reading twitter archived data from df dataframe. displaying top 5 rows .
+
+df.head()
+
+
+# In[14]:
+
+
+df.rating_denominator.value_counts()
+
+
+# In[15]:
+
+
+print(df.loc[df.rating_denominator == 11, 'text'])
+print(df.loc[df.rating_denominator == 2, 'text'])
+
+
+# In[16]:
+
+
+print(df['text'][784]) #@RT indicates retweeted and after clean - those tweets will be deleted by retweet_status column lookup.
+print(df['text'][1068]) #rating is 14/10. last surviving 9/11 search dog .
+print(df['text'][1662]) #rated as 10/10 and it is spotted by helicopter in high speed police chase after 7/11 robbed.
+print(df['text'][2335]) #3 1/2 legged dog and rating is 9/10 .
+
+
+# In[17]:
+
+
+
+df.rating_numerator.value_counts()
+
+
+
+# In[18]:
+
+
+sum(df['tweet_id'].duplicated())
+
+
+# In[19]:
+
+
+
+print(df.loc[df.rating_numerator == 204, 'text'])
+print(df.loc[df.rating_numerator == 143, 'text'])
+
+
+
+# In[20]:
+
+
+print(df.loc[df.rating_numerator == 666, 'text'])
+
+
+# In[21]:
+
+
+# verify numerators and denominators
+print(df['text'][1120])#17 dogs in total from link.
+print(df['text'][1634]) #11 dogs+ Two sneaky puppers=13 dogs
+print(df['text'][189]) #no pics
+
+
+# In[22]:
+
+
+# reading dog image data  from image dataframe. displaying top 5 rows .
+
+images.head()
+
+
+# In[23]:
+
+
+# using info command on dataframe , below displaying which columns have null values and
+#it become easy to decide which column should be dropped from our analysis.
+#for examples - in_reply_to_status_id ,in_reply_to_user_id etc
+df.info()
+
+
+# In[24]:
+
+
+# using info command on dataframe , below displaying which columns have null values and
+#it become easy to decide which column should be dropped from our analysis.
+#for examples - geo ,coordinates,in_reply_to_status_id,place etc
+df_tweets.info()
+
+
+# In[25]:
+
+
+# using info command on dataframe , below displaying which columns have null values and
+#it become easy to decide which column should be dropped from our analysis.
+# examples - alll columns have 2075 nn null values so all of the columns hold equal value in analysis .
+
+images.info()
+
+
+# In[26]:
+
+
+sum(images.jpg_url.duplicated())
+
+
+# In[27]:
+
+
+pd.concat(g for _, g in images.groupby("jpg_url") if len(g) > 1)
+
+
+# In[28]:
+
+
+images.img_num.value_counts()
+
+
+# In[29]:
+
+
+images.p1_dog.value_counts()
+
+
+# In[30]:
+
+
+images.p2_dog.value_counts()
+
+
+# In[31]:
+
+
+images.p3_dog.value_counts()
+
+
+#
+# # Step 1 - highlight Quality Issues-
+#
+# 1. retweet issue - remove any tweets - that being retweeted , finding the rows and deleting them from dataframe using important
+# columns retweeted_status  and retweet_count. these columns provides significant info about retweets.
+# 2. 181 records have retweeted_status_id in dataframe archied twitter data.whuich need to be exculded from dataset.
+# 3. renaming the image predictions table columns - p1 , p2,p3 by removing (_).
+# 4. name of the dogs mispelled or missing in twitter archived dataframe(df).
+# 5. renaming the id column to tweet_id for cross reference across 2 other tables.
+# 6. retweeted_status= 175 records needs to be exculded from df_tweets dataframe.
+# 7. The numerator and denominator columns have unusual values and it should be in float values.
+# 8. null values are not treated as null values in som of the columns.
+# 9 . jpg_url drop duplicated values .
+# 10. Drop columns that are not needed as shown by null values examples.
+# 11.tweet_id needs to convert number to string .
+# 12.Rating should be in float values for df dataframe .
+# 13 .convert id column from a number to a string in df_tweets dataframe.
+# 14.indexing  the df_tweets table using the tweet_id instead of id .
+#
+#
+# # step 2 -highlight  Tidyness Issues
+#
+# 1. parse the datetime information into seperate columns
+# 2. Date and Time columns need to be converted to datetime objects
+# 3.Remove unnecessary columns and keep following columns after renaming them : tweet_id, retweet count, favorite count,text
+# 4.join all tables into single dataset .
+#
+#
+
+# # Data cleaning
+
+# In[32]:
+
+
+# Before cleaning - making a copy of the dataframes .
+df_clean = df.copy() # Archived twitter data
+images_clean = images.copy() # dog images data
+df_tweets_clean = df_tweets.copy() # twitter API data cleanup
+
+
+# # Starting with Df_clean dataframe ( which is archived twitter dataset)
+# # Defining the 3 step approach for cleaning the data - define , code and test .
+
+# # Define -
+#
+# exlude tweets that have a retweeted_status as theose are retweeted .
+#
+
+# # Code - to do cleaning by programming
+
+# In[33]:
+
+
+df_clean[df_clean['retweeted_status_id'].notnull()==True]
+# there are 181 tweets which are retweets by the retweeted
+
+
+# In[34]:
+
+
+# drop these 181 rows to clean up this retweet issue .
+df_clean.drop(df_clean[df_clean['retweeted_status_id'].notnull()== True].index,inplace=True)
+
+
+# # Testing part to make sure those rows are dropped .
+
+# In[35]:
+
+
+
+
+df.info()
+
+df_clean.info()
+
+
+# # Define
+# rating_numerator and rating_denominator should be in float
+
+# # Code to convert ratings into strings
+
+# In[36]:
+
+
+
+
+df_clean['rating_numerator'] = df_clean['rating_numerator'].astype(float)
+df_clean['rating_denominator'] = df_clean['rating_denominator'].astype(float)
+
+
+
+# # Testing part to make sure it is converted into string. below columns values of ratings are indicated by float64
+
+# In[37]:
+
+
+df_clean.info()
+
+
+# # Define
+# tweet_id column should be objects.
+
+# # code to convert tweet_id to string .
+
+# In[38]:
+
+
+df_clean['tweet_id'] = df_clean['tweet_id'].astype(str)
+
+
+# # Test - make sure tweet_id is a object not int64 .
+
+# In[39]:
+
+
+df_clean.info()
+
+
+# # Define - Convert the timestamp column from a string to DateTime
+#
+
+# # Code - to clean up the isssue
+
+# In[40]:
+
+
+df_clean['timestamp'] = pd.to_datetime(df_clean['timestamp'])
+
+
+# In[41]:
+
+
+df_clean['date'] = df_clean['timestamp'].apply(lambda time: time.strftime('%m-%d-%Y'))
+df_clean['time'] = df_clean['timestamp'].apply(lambda time: time.strftime('%H:%M'))
+
+
+# # Test - to make sure timestamp is correctly modified as date & time .
+
+# In[42]:
+
+
+df_clean.info()
+
+
+# In[43]:
+
+
+df_clean.head(2)
+
+
+# # Define - clean up by correcting names
+#
+
+# # code
+
+# In[44]:
+
+
+
+df_clean['name'].replace('the', 'None', inplace=True)
+df_clean['name'].replace("light",'None', inplace=True)
+df_clean['name'].replace("life",'None', inplace=True)
+df_clean['name'].replace("an",'None', inplace=True)
+df_clean['name'].replace("a",'None', inplace=True)
+df_clean['name'].replace("by",'None', inplace=True)
+df_clean['name'].replace("actually",'None', inplace=True)
+df_clean['name'].replace("just",'None', inplace=True)
+df_clean['name'].replace("getting",'None', inplace=True)
+df_clean['name'].replace("infuriating",'None', inplace=True)
+df_clean['name'].replace("old",'None', inplace=True)
+df_clean['name'].replace("all",'None', inplace=True)
+df_clean['name'].replace("this",'None', inplace=True)
+df_clean['name'].replace("very",'None', inplace=True)
+df_clean['name'].replace("mad",'None', inplace=True)
+df_clean['name'].replace("not",'None', inplace=True)
+df_clean['name'].replace("one",'None', inplace=True)
+df_clean['name'].replace("my",'None', inplace=True)
+df_clean['name'].replace("O","O'Malley", inplace=True)
+df_clean['name'].replace("quite","None", inplace=True)
+df_clean['name'].replace("such","None", inplace=True)
+
+
+# # Test - by info function and name column non null values reduced to 2175
+
+# In[45]:
+
+
+df.info()
+df_clean.info()
+
+
+# # Define - Combining the Dog stages into one column names called stages - instead of doggo , floofer , pupper etc .
+
+# # code to comine all stages into one column and replace the value with appriporate values from 3 stages columns .
+
+# In[46]:
+
+
+df_clean['stage'] = df[['doggo', 'floofer','pupper','puppo']].apply(lambda x: ''.join(x), axis=1)
+
+df_clean['stage'].replace("NoneNoneNoneNone","None ", inplace=True)
+df_clean['stage'].replace("doggoNoneNoneNone","doggo", inplace=True)
+df_clean['stage'].replace("NoneflooferNoneNone","floofer", inplace=True)
+df_clean['stage'].replace("NoneNonepupperNone","pupper", inplace=True)
+df_clean['stage'].replace("NoneNoneNonepuppo","puppo", inplace=True)
+
+
+# # test the data in stage column that all the stages are combined
+
+# In[47]:
+
+
+df_clean
+
+
+# # Define - Remove unwanted & null columns from the df_clean dataframe.
+#
+
+# # code part to remove null & unwanted columns .
+
+# In[48]:
+
+
+df_clean.drop(['in_reply_to_status_id',
+               'in_reply_to_user_id',
+               'timestamp',
+               'source',
+               'text',
+              'retweeted_status_id',
+               'retweeted_status_user_id',
+               'retweeted_status_timestamp',
+               'expanded_urls',
+               'doggo',
+               'floofer',
+               'pupper',
+               'puppo'], axis=1,inplace=True)
+
+
+# # Test - verify all null values columns and unwanted columns are dropped .
+
+# In[49]:
+
+
+df_clean.info()
+
+
+# In[50]:
+
+
+df_clean.head(2)
+
+
+# In[51]:
+
+
+column_title = ['tweet_id',
+                'rating_numerator',
+                'rating_denominator',
+                'date',
+                'time',
+                'name',
+                'stage']
+df_clean = df_clean.reindex(columns=column_title)
+
+
+# In[52]:
+
+
+df_clean
+
+
+# # define - Date and Time columns should be datetime objects
+
+# # code for coversion and info command to test the conversion
+
+# In[53]:
+
+
+df_clean['date'] = pd.to_datetime(df_clean['date'])
+df_clean['time'] = pd.to_datetime(df_clean['time'])
+
+
+# In[54]:
+
+
+df_clean.info()
+
+
+# # saving data in CSV or TSV format for next day of analysis and visualization.
+# # Archived twitter data
+#
+
+# # Cleaning up of DF_tweets_clean dataframe.
+
+# In[55]:
+
+
+df_tweets_clean.columns
+
+
+# # Define -exclude retweeted_status tweets which are notnull  as these are retweeted.
+
+# # code to exclude the retweeted tweets and finally drop them
+
+# In[56]:
+
+
+df_tweets_clean[df_tweets_clean['retweeted_status'].notnull()==True] # finding the retweets
+df_tweets_clean.drop(df_tweets_clean[df_tweets_clean['retweeted_status'].notnull()== True].index,inplace=True) # dropping the retweets
+
+
+# # testing to make sure all the 175 retweeted are dropped .
+
+# In[57]:
+
+
+df_tweets=pd.read_json('tweet_json.txt')
+
+df_tweets.info()
+df_tweets_clean.info()
+
+
+# In[58]:
+
+
+df_tweets_clean.info()
+
+
+# # Define - remove null values , unncessary columns df_tweets_clean
+#
+
+# # Code - to remove unnecessary columns .
+
+# In[59]:
+
+
+df_tweets_clean.drop(['contributors',
+                     'coordinates',
+                     'created_at',
+                     'entities',
+                     'extended_entities',
+                     'favorited',
+                     'geo',
+                     'id_str',
+                     'in_reply_to_screen_name',
+                     'in_reply_to_status_id',
+                     'in_reply_to_status_id_str',
+                     'in_reply_to_user_id',
+                     'in_reply_to_user_id_str',
+                     'is_quote_status',
+                     'lang',
+                     'place',
+                     'possibly_sensitive',
+                     'possibly_sensitive_appealable',
+                     'quoted_status',
+                     'quoted_status_id',
+                     'quoted_status_id_str',
+                     'retweeted',
+                     'retweeted_status',
+                     'source',
+                     'truncated',
+                     'user'], axis=1,inplace=True)
+
+
+# # test to make sure all the unncessary columns are dropped .
+
+# In[60]:
+
+
+df_tweets_clean.info()
+
+
+# # Define - convert tweet_id column from int64 to a string . first change the name from id to tweet_id to make sure it is consistent across other dataframes.
+#
+
+# # code for conversion -
+
+# In[61]:
+
+
+df_tweets_clean.rename(columns={'id': 'tweet_id'}, inplace=True)
+
+df_tweets_clean.tweet_id = df_tweets_clean.tweet_id.astype(str)
+
+
+# # testing to make sure it is converted into string and column name is also changed .
+
+# In[62]:
+
+
+df_tweets_clean.info()
+
+
+# # starting cleaning up image dataframe.
+#
+# # Define - drop 66 duplicated jpg_url from images .
+
+# # Code to delete duplicated jpg_url
+#
+#
+#
+
+# In[63]:
+
+
+images_clean = images_clean.drop_duplicates(subset=['jpg_url'], keep='last')
+
+
+# # Test to make sure duplicates dropped .
+
+# In[64]:
+
+
+sum(images_clean['jpg_url'].duplicated())
+
+
+# In[65]:
+
+
+images.info()
+
+
+# In[66]:
+
+
+images_clean.info()
+
+
+# # define -  change tweet_id from int64 to string
+
+# # code for conversion
+
+# In[67]:
+
+
+images_clean.tweet_id = images_clean.tweet_id.astype(str)
+
+
+# # testing to check the tweet_id datatype .
+
+# In[68]:
+
+
+images_clean.info()
+
+
+# In[69]:
+
+
+images_clean
+
+
+# # Define - removing underscore in the columns values of p1,p2,p3 .
+
+# In[70]:
+
+
+images_clean['p1'] = images_clean['p1'].str.replace('_', ' ')
+images_clean['p2'] = images_clean['p2'].str.replace('_', ' ')
+images_clean['p3'] = images_clean['p3'].str.replace('_', ' ')
+
+
+# In[71]:
+
+
+images_clean
+
+
+# In[72]:
+
+
+images_clean.info()
+
+
+# # Join all the dataframe to make master dataframe
+
+# In[73]:
+
+
+images_clean
+
+
+# In[74]:
+
+
+images_clean.info()
+
+
+# In[75]:
+
+
+df_clean
+
+
+# In[76]:
+
+
+df_clean.info()
+
+
+# In[77]:
+
+
+df_tweets_clean.info()
+
+
+# In[78]:
+
+
+df_tweets_clean
+
+
+# In[79]:
+
+
+
+type(df_clean['tweet_id'].iloc[0])
+
+
+
+# In[80]:
+
+
+
+df_clean.tweet_id = df_clean.tweet_id.astype(str)
+
+
+
+# In[81]:
+
+
+df_clean.info()
+
+
+# In[82]:
+
+
+#combining archived twitter cleaned dataframe with twitter json dataframe then combining with image dataframe.
+# join on tweet_id and used inner join .
+
+twitter_archive_master = pd.merge(df_tweets_clean, images_clean,on='tweet_id', how='inner')
+
+
+
+# In[83]:
+
+
+twitter_archive_master.info()
+
+
+# In[84]:
+
+
+twitter_archive_master
+
+
+# In[85]:
+
+
+twitter_archive_master = pd.merge(twitter_archive_master, df_clean,on='tweet_id', how='inner')
+
+
+# In[86]:
+
+
+twitter_archive_master
+
+
+# In[87]:
+
+
+twitter_archive_master.info()
+
+
+# # Storing, Analyzing, and Visualizing Data-
+#
+# save all the the cleaned up  df's in a CSV file.
+# Analyze and visualize your wrangled data in your wrangle_act.ipynb Jupyter Notebook. At least three (3) insights and one (1) visualization must be produced.
+#
+
+# In[88]:
+
+
+# saving all the cleaned dataframes into files and newly combined and joined dataframe into twitter_archive_master.csv
+
+twitter_archive_master.to_csv('twitter_archive_master.csv')
+df_clean.to_csv('df_clean.csv')
+df_tweets_clean.to_csv('df_tweets_clean.csv')
+images_clean.to_csv('images_clean.csv')
+
+
+# In[89]:
+
+
+twitter_archive_master
+
+
+# In[90]:
+
+
+twitter_archive_master.describe()
+
+
+# # Insight # 1 -
+#
+# # Define Lets find lowest rated dogs -
+# code - below
+
+# In[91]:
+
+
+
+twitter_archive_master[twitter_archive_master['rating_numerator']==1]
+
+
+# In[92]:
+
+
+print(twitter_archive_master.loc[twitter_archive_master.rating_numerator == 1, 'jpg_url'])
+
+
+# # 2 pics are wrong - fan and hen .
+
+# # Insights # 2  & visual # 1
+#
+# # Define - ratings vs time & favorites_counts , retweets_count vs time plots .
+#
+#
+#
+# # code below
+
+# In[93]:
+
+
+twitter_archive_master.info()
+
+
+# In[94]:
+
+
+twitter_archive_master.set_index('date', inplace=True)
+
+
+# In[95]:
+
+
+twitter_archive_master[['favorite_count', 'retweet_count']].plot(style = '.', alpha = 0.4)
+plt.title('count of favorites vs retweets with Time')
+plt.xlabel('date')
+plt.ylabel('Count');
+
+
+# # favorite and retweet counts increases with time .
+
+# In[96]:
+
+
+twitter_archive_master['rating']=twitter_archive_master['rating_numerator'] / twitter_archive_master['rating_denominator']
+
+
+# In[97]:
+
+
+twitter_archive_master
+
+
+# In[98]:
+
+
+twitter_archive_master.info()
+
+
+# In[99]:
+
+
+twitter_archive_master.plot(y ='rating_numerator', ylim=[0,14], style = '.', alpha = 0.4)
+plt.title('Rating with Time')
+plt.xlabel('date')
+plt.ylabel('rating');
+
+
+# In[100]:
+
+
+# rating gradually increases over time .
+#Below is the perason correlation for favorites , retweet and rating _ numerator.
+
+
+# In[101]:
+
+
+twitter_archive_master[['favorite_count', 'retweet_count','rating_numerator']].corr(method='pearson')
+
+
+# In[102]:
+
+
+dog_type = []
+
+x = ['pupper', 'puppo', 'doggo', 'floof']
+y = ['pupper', 'puppo', 'doggo', 'floof']
+
+for row in twitter_archive_master['text']:
+    row = row.lower()
+    for word in x:
+        if word in str(row):
+            dog_type.append(y[x.index(word)])
+            break
+    else:
+        dog_type.append('None')
+
+twitter_archive_master['dog_type'] = dog_type
+
+
+
+
+
+# In[103]:
+
+
+twitter_archive_master
+
+
+# In[104]:
+
+
+twitter_archive_master['dog_type'].value_counts()
+
+
+# # assigned 0.0 to ratings for none dog type .
+
+# In[105]:
+
+
+twitter_archive_master.loc[twitter_archive_master['dog_type'] == 'None', 'dog_type'] = None
+twitter_archive_master.loc[twitter_archive_master['rating'] == 0.0, 'rating'] = np.nan
+
+
+# In[107]:
+
+
+twitter_archive_master.boxplot(column='rating', by='dog_type',figsize=(16,16));
+
+
+# # Insights # 3
+# # Define most common used dog names
+#
+#
+#
+# # code below
+
+# In[108]:
+
+
+# count the most common dogs .
+from collections import Counter
+
+y = twitter_archive_master['name']
+
+count = Counter(y)
+
+#Test
+count.most_common(10)
+
+
+# In[109]:
+
+
+# Oliver =8 times used , winston =7 , tucker =6 , lucy=6 ,cooper =6 .
+
+
+# # insights # 4 & visual # 2
+#
+# # define - find the most common dog in the dataset, this cleanup should be done before analyzing . realize after starting analyzing the dataset .
+
+# In[111]:
+
+
+###using  - prediction columns(p1, p2 or p3) along with confidence columns to come up with true dog_breed type .
+# creating 2 columns . first storing data in lists .
+dog_breed_type = []
+confidence_list = []
+
+
+def image(twitter_archive_master):
+    if twitter_archive_master['p1_dog'] == True:
+        dog_breed_type.append(twitter_archive_master['p1'])
+        confidence_list.append(twitter_archive_master['p1_conf'])
+    elif twitter_archive_master['p2_dog'] == True:
+        dog_breed_type.append(twitter_archive_master['p2'])
+        confidence_list.append(twitter_archive_master['p2_conf'])
+    elif twitter_archive_master['p3_dog'] == True:
+        dog_breed_type.append(twitter_archive_master['p3'])
+        confidence_list.append(twitter_archive_master['p3_conf'])
+    else:
+        dog_breed_type.append('Error')
+        confidence_list.append('Error')
+
+
+twitter_archive_master.apply(image, axis=1)
+
+
+twitter_archive_master['dog_breed_type'] = dog_breed_type
+twitter_archive_master['confidence_list'] = confidence_list
+
+
+# In[112]:
+
+
+twitter_archive_master['dog_breed_type'].value_counts()
+
+
+# In[113]:
+
+
+twitter_archive_master = twitter_archive_master[twitter_archive_master['dog_breed_type'] != 'Error']
+
+
+# In[114]:
+
+
+df_dog_type_breed = twitter_archive_master.groupby('dog_breed_type').filter(lambda x: len(x) >= 9)
+
+df_dog_type_breed['dog_breed_type'].value_counts().plot(kind = 'bar')
+plt.title('Most rated Dog breed Type')
+plt.xlabel('Count')
+plt.ylabel('dog breed ')
+fig = plt.gcf()
+
+
+# In[115]:
+
+
+dog_breed_type_mean = twitter_archive_master.groupby('dog_breed_type').mean()
+
+
+# In[116]:
+
+
+dog_breed_type_sorted = dog_breed_type_mean['rating_numerator'].sort_values()
+
+dog_breed_type_sorted
+
+
+# # Afghan hound and Japanese_spaniel has the lowest rating while Clumber & great pyreness have the highest average ratings
+
+# In[117]:
+
+
+
+print(twitter_archive_master.loc[twitter_archive_master.dog_breed_type == 'Japanese spaniel', 'jpg_url'])
+
+
+
+# In[118]:
+
+
+twitter_archive_master.groupby('dog_breed_type')['rating_numerator'].describe()
+
+
+# In[119]:
+
+
+twitter_archive_master.to_csv('twitter_archive_master.csv')
+
+
+# In[120]:
+
+
+twitter_archive_master[twitter_archive_master['rating_numerator'] <= 14]['rating_numerator'].describe()
+
+
+# In[3]:
+
+
+import pandas as pd
+twitter_archive_master=pd.read_csv("twitter_archive_master.csv")
+
+
+# In[4]:
+
+
+print(twitter_archive_master.loc[twitter_archive_master.dog_breed_type == 'clumber', 'jpg_url'])
+
+
+# In[6]:
+
+
+print(twitter_archive_master.loc[twitter_archive_master.dog_breed_type == 'golden retriever', 'jpg_url'])
